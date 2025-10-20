@@ -1,0 +1,32 @@
+---
+dependency:
+  name: galaxy
+driver:
+  name: docker
+platforms:
+  - name: instance
+    image: geerlingguy/docker-ubuntu2204-ansible:latest
+    privileged: true
+    command: /lib/systemd/systemd
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    capabilities:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+provisioner:
+  name: ansible
+  playbooks:
+    converge: converge.yml
+  inventory:
+    host_vars:
+      instance:
+        openvpn_port: 1195
+        openvpn_protocol: udp
+        openvpn_configs_dir: /srv/openvpn/configs
+        openvpn_clients:
+          - testclient1
+          - testclient2
+verifier:
+  name: testinfra
+

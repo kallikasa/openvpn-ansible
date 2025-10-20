@@ -1,0 +1,162 @@
+---
+- name: Download openvpn-install script
+  ansible.builtin.get_url:
+    url: "{{ openvpn_script_url }}"
+    dest: "{{ openvpn_script_path }}"
+    mode: '0755'
+    force: false
+
+- name: Check if OpenVPN is already configured
+  ansible.builtin.stat:
+    path: /etc/openvpn/server/server.conf
+  register: openvpn_configured
+
+- name: Check if OpenVPN was installed in wrong location
+  ansible.builtin.stat:
+    path: /etc/openvpn/server.conf
+  register: openvpn_wrong_location
+
+- name: Install OpenVPN non-interactively
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export AUTO_INSTALL=y
+    export APPROVE_INSTALL=y
+    export APPROVE_IP=y
+    export IPV6_SUPPORT=n
+    export PORT={{ openvpn_port }}
+    export PROTOCOL={{ openvpn_protocol }}
+    export DNS=1
+    export COMPRESSION_ENABLED=n
+    export CUSTOMIZE_ENC=n
+    export CLIENT={{ openvpn_clients[0] }}
+    export PASS=1
+    {{ openvpn_script_path }}
+  args:
+    executable: /bin/bash
+  when: not openvpn_configured.stat.exists and not openvpn_wrong_location.stat.exists
+  changed_when: true
+
+- name: Move config to correct location
+  ansible.builtin.command:
+    cmd: mv /etc/openvpn/server.conf /etc/openvpn/server/server.conf
+  when: openvpn_wrong_location.stat.exists and not openvpn_configured.stat.exists
+  changed_when: true
+
+- name: Check if config has relative paths that need fixing
+  ansible.builtin.shell: |
+    set -euo pipefail
+    if [ ! -f /etc/openvpn/server/server.conf ]; then
+      exit 1
+    fi
+    grep -E '^ca [^/]|^cert [^/]|^key [^/]|^tls-crypt [^/]|^crl-verify [^/]' /etc/openvpn/server/server.conf
+  args:
+    executable: /bin/bash
+  register: has_relative_paths
+  changed_when: false
+  failed_when: false
+  when: openvpn_configured.stat.exists or openvpn_wrong_location.stat.exists
+
+- name: Fix config file paths to use absolute paths
+  ansible.builtin.replace:
+    path: /etc/openvpn/server/server.conf
+    regexp: "{{ item.regexp }}"
+    replace: "{{ item.replace }}"
+  loop:
+    - { regexp: '^ca ca.crt', replace: 'ca /etc/openvpn/ca.crt' }
+    - { regexp: '^cert server_.*\.crt', replace: 'cert /etc/openvpn/server_4EcZbZPrxb3w0JgG.crt' }
+    - { regexp: '^key server_.*\.key', replace: 'key /etc/openvpn/server_4EcZbZPrxb3w0JgG.key' }
+    - { regexp: '^tls-crypt tls-crypt.key', replace: 'tls-crypt /etc/openvpn/tls-crypt.key' }
+    - { regexp: '^crl-verify crl.pem', replace: 'crl-verify /etc/openvpn/crl.pem' }
+  when: 
+    - openvpn_configured.stat.exists or openvpn_wrong_location.stat.exists
+    - has_relative_paths.rc == 0
+
+- name: Ensure OpenVPN uses correct port
+  ansible.builtin.lineinfile:
+    path: /etc/openvpn/server/server.conf
+    regexp: '^port '
+    line: 'port {{ openvpn_port }}'
+  when: openvpn_configured.stat.exists or openvpn_wrong_location.stat.exists
+
+- name: Get actual server certificate name
+  ansible.builtin.shell: |
+    set -euo pipefail
+    ls /etc/openvpn/server_*.crt 2>/dev/null | head -1 | xargs basename || true
+  args:
+    executable: /bin/bash
+  register: server_cert_name
+  changed_when: false
+  failed_when: false
+
+- name: Get actual server key name
+  ansible.builtin.shell: |
+    set -euo pipefail
+    ls /etc/openvpn/server_*.key 2>/dev/null | head -1 | xargs basename || true
+  args:
+    executable: /bin/bash
+  register: server_key_name
+  changed_when: false
+  failed_when: false
+
+- name: Update config with actual certificate names
+  ansible.builtin.lineinfile:
+    path: /etc/openvpn/server/server.conf
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  loop:
+    - { regexp: '^cert ', line: "cert /etc/openvpn/{{ server_cert_name.stdout }}" }
+    - { regexp: '^key ', line: "key /etc/openvpn/{{ server_key_name.stdout }}" }
+  when: server_cert_name.stdout != "" and server_key_name.stdout != ""
+
+- name: Ensure OpenVPN service is enabled and running
+  ansible.builtin.service:
+    name: openvpn-server@server
+    state: started
+    enabled: true
+
+- name: Generate client configurations
+  ansible.builtin.shell: |
+    set -euo pipefail
+    cd /etc/openvpn/easy-rsa
+    
+    # Check if client cert exists, if not create it
+    if [ ! -f "pki/issued/{{ item }}.crt" ]; then
+      ./easyrsa --batch build-client-full "{{ item }}" nopass
+    fi
+    
+    # Get server IP
+    SERVER_IP=$(curl -s ifconfig.me || echo "{{ ansible_default_ipv4.address }}")
+    
+    # Create inline .ovpn file
+    cat > "{{ openvpn_configs_dir }}/{{ item }}.ovpn" <<EOF
+    client
+    dev tun
+    proto {{ openvpn_protocol }}
+    remote ${SERVER_IP} {{ openvpn_port }}
+    resolv-retry infinite
+    nobind
+    persist-key
+    persist-tun
+    remote-cert-tls server
+    data-ciphers AES-256-GCM:AES-128-GCM:CHACHA20-POLY1305
+    verb 3
+    <ca>
+    $(cat /etc/openvpn/ca.crt)
+    </ca>
+    <cert>
+    $(openssl x509 -in pki/issued/{{ item }}.crt)
+    </cert>
+    <key>
+    $(cat pki/private/{{ item }}.key)
+    </key>
+    <tls-crypt>
+    $(cat /etc/openvpn/tls-crypt.key)
+    </tls-crypt>
+    EOF
+    
+    chmod 644 "{{ openvpn_configs_dir }}/{{ item }}.ovpn"
+  args:
+    executable: /bin/bash
+    creates: "{{ openvpn_configs_dir }}/{{ item }}.ovpn"
+  loop: "{{ openvpn_clients }}"
+

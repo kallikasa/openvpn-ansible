@@ -1,0 +1,58 @@
+# Inventory files with credentials
+inventories/*/hosts.ini
+*-inventory.ini
+!*.example
+
+# Ansible
+*.retry
+.ansible/
+ansible.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.log
+*.bak
+
+# Molecule
+.molecule/
+.cache/
+
+# Ansible facts cache
+/tmp/ansible_facts
+
+# Secrets
+secrets.yml
+vault-pass.txt
+*.key
+*.pem
+
+# Custom
+test-server-inventory.ini
+plan.mdm
+*INTERNAL*.md

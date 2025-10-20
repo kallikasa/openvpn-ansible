@@ -1,0 +1,15 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  vars:
+    openvpn_configs_dir: /srv/openvpn/configs
+  tasks:
+    - name: Include docker role
+      ansible.builtin.include_role:
+        name: docker
+
+    - name: Include nginx_file_browser role
+      ansible.builtin.include_role:
+        name: nginx_file_browser
+

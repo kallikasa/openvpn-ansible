@@ -1,0 +1,9 @@
+---
+- name: Provision OpenVPN and Nginx file browser
+  hosts: all
+  become: true
+  roles:
+    - role: docker
+    - role: nginx_file_browser
+    - role: openvpn
+

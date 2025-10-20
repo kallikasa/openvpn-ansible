@@ -1,0 +1,16 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  vars:
+    openvpn_port: 1195
+    openvpn_protocol: udp
+    openvpn_configs_dir: /srv/openvpn/configs
+    openvpn_clients:
+      - testclient1
+      - testclient2
+  tasks:
+    - name: Include openvpn role
+      ansible.builtin.include_role:
+        name: openvpn
+

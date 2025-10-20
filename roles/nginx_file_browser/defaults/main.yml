@@ -1,0 +1,10 @@
+---
+# Nginx file browser default variables
+# These can be overridden in group_vars or inventory
+nginx_image: nginx:alpine
+nginx_container_name: nginx-file-browser
+nginx_host_port: 80
+nginx_container_root: /usr/share/nginx/html
+nginx_index_subdir: ovpn
+openvpn_configs_dir: /srv/openvpn/configs
+

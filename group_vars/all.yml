@@ -1,0 +1,15 @@
+---
+# Global variables for OpenVPN and Nginx setup
+openvpn_port: 1195
+openvpn_protocol: udp
+openvpn_configs_dir: /srv/openvpn/configs
+nginx_image: nginx:alpine
+nginx_container_name: nginx-file-browser
+nginx_host_port: 80
+nginx_container_root: /usr/share/nginx/html
+nginx_index_subdir: ovpn
+openvpn_clients:
+  - alice
+  - bob
+  - carol
+

@@ -1,0 +1,26 @@
+# Production Inventory Example
+# Copy this file to hosts.ini and configure with your servers
+
+[vpn_servers]
+# Add your production servers here
+# Examples:
+
+# Using SSH key authentication (recommended):
+# vpn.example.com ansible_user=root ansible_ssh_private_key_file=~/.ssh/id_rsa
+
+# Using a different SSH user:
+# vpn.example.com ansible_user=myuser ansible_become=true
+
+# Using SSH password (not recommended for production):
+# vpn.example.com ansible_user=root ansible_ssh_pass='your_password' ansible_become_pass='your_password'
+
+# Multiple servers:
+# vpn1.example.com ansible_user=root
+# vpn2.example.com ansible_user=root
+# vpn3.example.com ansible_user=root
+
+[vpn_servers:vars]
+ansible_python_interpreter=/usr/bin/python3
+# Uncomment to disable host key checking (not recommended for production):
+# ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+
